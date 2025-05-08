@@ -119,7 +119,9 @@ type qrEncoder struct {
 	errCorr errorCorrectionLevel
 }
 
-func (q *qrEncoder) Encode(data string, header ...string) (string, error) {
+// Encode encodes data with configuration from NewEncoder into a qr code string.
+// If headers are provided, they will be displayed above the qr code in the output.
+func (q *qrEncoder) Encode(data string, headers ...string) (string, error) {
 	strFunc := q.strFunc
 	if strFunc == nil {
 		return "", fmt.Errorf("encoder misconfigured, use NewEncoder when creating it")
@@ -130,7 +132,7 @@ func (q *qrEncoder) Encode(data string, header ...string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return strFunc(q.rc, &code, &header)
+	return strFunc(q.rc, &code, &headers)
 }
 
 func text(rc *runeCol, code *image.Image, headers *[]string) (string, error) {
@@ -141,8 +143,8 @@ func text(rc *runeCol, code *image.Image, headers *[]string) (string, error) {
 	dx := (*code).Bounds().Dx()
 	dy := (*code).Bounds().Dy()
 	wr := rc.getRune(color.White, color.White)
-	prefix := ""
-	suffix := "\n"
+	prefix := string(wr)
+	suffix := string(wr) + "\n"
 
 	hashead := headers != nil && len(*headers) > 0
 
@@ -157,6 +159,8 @@ func text(rc *runeCol, code *image.Image, headers *[]string) (string, error) {
 		output += string(whole) + pad(dx+2, lower) + string(whole) + "\n" + string(whole) + pad(dx+2, wr) + string(whole) + "\n"
 		prefix = string(whole) + string(wr)
 		suffix = string(wr) + string(whole) + "\n"
+	} else {
+		output += pad(dx+2, wr) + "\n"
 	}
 
 	output += prefix
@@ -180,13 +184,66 @@ func text(rc *runeCol, code *image.Image, headers *[]string) (string, error) {
 
 	if hashead {
 		output += string(whole) + pad(dx+2, lower) + string(whole) + "\n"
+	} else {
+		output += pad(dx+2, wr) + "\n"
 	}
 
 	return output, nil
 }
 
+const css = `<style>
+.qrstr-white {
+	background-color: white;
+	color: white;
+	border-color: white;
+	padding: 0.5em;
+}
+.qrstr-black {
+	background-color: black;
+	color: black;
+	border-color: black;
+	padding: 0.5em;
+}
+.qrstr-code , .qrstr-code * {
+	border: 0;
+	font-family: monospace;
+	padding: 0;
+	margin: 0;
+	font-size: 10%;
+	letter-spacing: 0;
+	border-spacing: 0;
+	border-collapse: collapse;
+}
+</style>
+`
+
 func html(rc *runeCol, code *image.Image, headers *[]string) (string, error) {
-	var output = ""
+	var output = "<div style=\"width: min-content;background: white; color: black;  padding: 1lh;\">\n" + css
+	if code == nil {
+		return "", fmt.Errorf("encoder misconfigured, use NewEncoder when creating it")
+	}
+	hashead := headers != nil && len(*headers) > 0
+	if hashead {
+		for _, v := range *headers {
+			output += "<p>" + v + "</p>\n"
+		}
+		output += "<hr>\n"
+	}
+	dx := (*code).Bounds().Dx()
+	dy := (*code).Bounds().Dy()
+	output += "<table class\"qrstr-code\" style=\"border-collapse: collapse;\">\n"
+	for y := 0; y < dy; y++ {
+		output += "<tr>\n"
+		for x := 0; x < dx; x++ {
+			if (*code).At(x, y) == color.Black {
+				output += "<td class=\"qrstr-black\"></td>\n"
+			} else {
+				output += "<td class=\"qrstr-white\"></td>\n"
+			}
+		}
+		output += "</tr>\n"
+	}
+	output += "</table></div>\n"
 	return output, nil
 }
 
@@ -216,7 +273,11 @@ const (
 	ErrorCorrection30Percent errorCorrectionLevel = 3
 )
 
-// NewEncoder returns a new qrEncoder code with the given data and headers
+// NewEncoder returns qr encoder with the given type and error correction level.
+// The encoder type determines the output format of the qr code.
+// The error correction level determines the amount of data that can be recovered from the qr code.
+// The encoder type must be one of the following: TextDarkMode, TextLightMode, HTMLMode
+// The error correction level must be one of the following: ErrorCorrection7Percent, ErrorCorrection15Percent, ErrorCorrection25Percent, ErrorCorrection30Percent
 func NewEncoder(encoderType encoderType, errorCorrectionLevel errorCorrectionLevel) (*qrEncoder, error) {
 	var q qrEncoder
 	switch encoderType {

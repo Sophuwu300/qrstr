@@ -2,9 +2,8 @@ package qrstr
 
 /*
  * This file is to turn strings into unicode or html qr codes.
- * Author: sophuwu <sophie@skisiel.com>
+ * Author: sophuwu <sophie@sophuwu.com>
  * Feel free to use this code in any way you want.
- * Just call QR("string", header bool, html bool) to get a qr code.
  * The header will display the string above the qr code.
  */
 

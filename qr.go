@@ -183,7 +183,7 @@ func text(rc *runeCol, code *image.Image, headers *[]string) (string, error) {
 	}
 
 	if hashead {
-		output += string(whole) + pad(dx+2, lower) + string(whole) + "\n"
+		output += pad(dx+4, wr) + "\n"
 	} else {
 		output += pad(dx+2, wr) + "\n"
 	}
@@ -262,6 +262,9 @@ const (
 	// HTMLMode makes qr codes for embedding in HTML documents or web pages.
 	// Generates a table using HTML tags, does not require a monospace font.
 	HTMLMode encoderType = 2
+	// TextXTermMode makes qr codes for printing on xterm terminals with auto color.
+	// MUST BE PRINTED/DISPLAYED USING A MONOSPACE FONT.
+	TextXTermMode encoderType = 3
 
 	// ErrorCorrection7Percent indicates 7% of lost data can be recovered, makes the qr code smaller
 	ErrorCorrection7Percent errorCorrectionLevel = 0
@@ -291,6 +294,19 @@ func NewEncoder(encoderType encoderType, errorCorrectionLevel errorCorrectionLev
 		break
 	case HTMLMode:
 		q.strFunc = html
+		break
+	case TextXTermMode:
+		q.rc = &darkMode
+		q.strFunc = func(rc *runeCol, code *image.Image, headers *[]string) (string, error) {
+			s, e := text(rc, code, headers)
+			if e != nil {
+				return "", e
+			}
+			front := "\033[40;97m"
+			back := "\033[0m\n"
+			s = strings.ReplaceAll(s, "\n", back+front)
+			return front + strings.TrimSuffix(s, front), nil
+		}
 		break
 	default:
 		return nil, fmt.Errorf("invalid encoder type: %d", encoderType)

@@ -113,15 +113,15 @@ func wrap(w int, s ...string) []string {
 	return slices.Clip(lines)
 }
 
-type qrEncoder struct {
+type Encoder struct {
 	strFunc func(rc *runeCol, code *image.Image, headers *[]string) (string, error)
 	rc      *runeCol
-	errCorr errorCorrectionLevel
+	errCorr ErrorCorrectionLevel
 }
 
 // Encode encodes data with configuration from NewEncoder into a qr code string.
 // If headers are provided, they will be displayed above the qr code in the output.
-func (q *qrEncoder) Encode(data string, headers ...string) (string, error) {
+func (q *Encoder) Encode(data string, headers ...string) (string, error) {
 	strFunc := q.strFunc
 	if strFunc == nil {
 		return "", fmt.Errorf("encoder misconfigured, use NewEncoder when creating it")
@@ -247,37 +247,37 @@ func html(rc *runeCol, code *image.Image, headers *[]string) (string, error) {
 	return output, nil
 }
 
-type encoderType int
-type errorCorrectionLevel qr.ErrorCorrectionLevel
+type EncoderType int
+type ErrorCorrectionLevel qr.ErrorCorrectionLevel
 
 const (
 	// TextDarkMode makes qr codes for printing on dark backgrounds with white text,
 	// like a terminal or a screen with dark/night mode enabled.
 	// This mode is not recommended for terminals, use TerminalMode instead.
 	// MUST BE PRINTED/DISPLAYED USING A MONOSPACE FONT.
-	TextDarkMode encoderType = 0
+	TextDarkMode EncoderType = 0
 	// TextLightMode makes qr codes for printing on light backgrounds with black text,
 	// like white paper or a screen with light mode.
 	// This mode is not recommended for terminals, use TerminalMode instead.
 	// MUST BE PRINTED/DISPLAYED USING A MONOSPACE FONT.
-	TextLightMode encoderType = 1
+	TextLightMode EncoderType = 1
 	// HTMLMode makes qr codes for embedding in HTML documents or web pages.
 	// Colours are set automatically with this mode.
 	// Generates a table using HTML tags, does not require a monospace font.
-	HTMLMode encoderType = 2
+	HTMLMode EncoderType = 2
 	// TerminalMode makes qr codes for printing on xterm terminals with auto color.
 	// Colours are set automatically with this mode.
 	// MUST BE PRINTED/DISPLAYED USING A MONOSPACE FONT.
-	TerminalMode encoderType = 3
+	TerminalMode EncoderType = 3
 
 	// ErrorCorrection7Percent indicates 7% of lost data can be recovered, makes the qr code smaller
-	ErrorCorrection7Percent errorCorrectionLevel = 0
+	ErrorCorrection7Percent ErrorCorrectionLevel = 0
 	// ErrorCorrection15Percent indicates 15% of lost data can be recovered, default
-	ErrorCorrection15Percent errorCorrectionLevel = 1
+	ErrorCorrection15Percent ErrorCorrectionLevel = 1
 	// ErrorCorrection25Percent indicates 25% of lost data can be recovered, makes the qr code bigger
-	ErrorCorrection25Percent errorCorrectionLevel = 2
+	ErrorCorrection25Percent ErrorCorrectionLevel = 2
 	// ErrorCorrection30Percent indicates 30% of lost data can be recovered, makes the qr code very big
-	ErrorCorrection30Percent errorCorrectionLevel = 3
+	ErrorCorrection30Percent ErrorCorrectionLevel = 3
 )
 
 // NewEncoder returns qr encoder with the given type and error correction level.
@@ -285,8 +285,8 @@ const (
 // The error correction level determines the amount of data that can be recovered from the qr code.
 // The encoder type must be one of the following: TextDarkMode, TextLightMode, HTMLMode
 // The error correction level must be one of the following: ErrorCorrection7Percent, ErrorCorrection15Percent, ErrorCorrection25Percent, ErrorCorrection30Percent
-func NewEncoder(encoderType encoderType, errorCorrectionLevel errorCorrectionLevel) (*qrEncoder, error) {
-	var q qrEncoder
+func NewEncoder(encoderType EncoderType, errorCorrectionLevel ErrorCorrectionLevel) (*Encoder, error) {
+	var q Encoder
 	switch encoderType {
 	case TextDarkMode:
 		q.rc = &darkMode

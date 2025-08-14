@@ -9,11 +9,12 @@ package qrstr
 
 import (
 	"fmt"
-	"github.com/boombuler/barcode/qr"
 	"image"
 	"image/color"
 	"slices"
 	"strings"
+
+	"github.com/boombuler/barcode/qr"
 )
 
 // utf8r aliases rune
@@ -118,12 +119,14 @@ type Encoder struct {
 	errCorr ErrorCorrectionLevel
 }
 
+var ErrCodeNil = fmt.Errorf("code is nil, the encoder is misconfigured, or the data is invalid")
+
 // Encode encodes data with configuration from NewEncoder into a qr code string.
 // If headers are provided, they will be displayed above the qr code in the output.
 func (q *Encoder) Encode(data string, headers ...string) (string, error) {
 	strFunc := q.strFunc
 	if strFunc == nil {
-		return "", fmt.Errorf("encoder misconfigured, use NewEncoder when creating it")
+		return "", ErrCodeNil
 	}
 	var code image.Image
 	var err error
@@ -136,7 +139,7 @@ func (q *Encoder) Encode(data string, headers ...string) (string, error) {
 
 func text(rc *runeCol, code *image.Image, headers *[]string) (string, error) {
 	if rc == nil || code == nil {
-		return "", fmt.Errorf("encoder misconfigured, use NewEncoder when creating it")
+		return "", ErrCodeNil
 	}
 	var output = ""
 	dx := (*code).Bounds().Dx()
@@ -190,59 +193,59 @@ func text(rc *runeCol, code *image.Image, headers *[]string) (string, error) {
 	return output, nil
 }
 
-const css = `<style>
-.qrstr-white {
-	background-color: white;
-	color: white;
-	border-color: white;
-	padding: 0.5em;
+var ErrHeadersNotSupported = fmt.Errorf("headers are not supported in this mode")
+
+func svg(rc *runeCol, code *image.Image, headers *[]string) (string, error) {
+	if headers != nil && len(*headers) > 0 {
+		return "", ErrHeadersNotSupported
+	}
+	if code == nil {
+		return "", ErrCodeNil
+	}
+	var output string
+	dx := (*code).Bounds().Dx()
+	dy := (*code).Bounds().Dy()
+	output = fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0.5 %d %d">`, dx, dy)
+	output += fmt.Sprintf(`<rect x="0" y="0.5" width="%d" height="%d" fill="white"></rect>`, dx, dy)
+	fln := func(c color.Color, x, y int) string {
+		if c == color.Black {
+			return fmt.Sprintf("H%d", x)
+		}
+		return fmt.Sprintf("M%d,%d", x, y+1)
+	}
+	var path string
+	var c color.Color
+	for y := 0; y < dy; y++ {
+		path += fmt.Sprintf("M0,%d", y+1)
+		c = (*code).At(0, y)
+		for x := 1; x < dx; x++ {
+			if (*code).At(x, y) == c {
+				continue
+			}
+			path += fln(c, x, y)
+			c = (*code).At(x, y)
+		}
+		path += fln(c, dx, y)
+	}
+	output += fmt.Sprintf(`<path d="%s" stroke-width="1" stroke="black"></path>`, path)
+	return output + "</svg>", nil
 }
-.qrstr-black {
-	background-color: black;
-	color: black;
-	border-color: black;
-	padding: 0.5em;
-}
-.qrstr-code , .qrstr-code * {
-	border: 0;
-	font-family: monospace;
-	padding: 0;
-	margin: 0;
-	font-size: 10%;
-	letter-spacing: 0;
-	border-spacing: 0;
-	border-collapse: collapse;
-}
-</style>
-`
 
 func html(rc *runeCol, code *image.Image, headers *[]string) (string, error) {
-	var output = "<div style=\"width: min-content;background: white; color: black;  padding: 1lh;\">\n" + css
 	if code == nil {
-		return "", fmt.Errorf("encoder misconfigured, use NewEncoder when creating it")
+		return "", ErrCodeNil
 	}
-	hashead := headers != nil && len(*headers) > 0
-	if hashead {
+	var output = fmt.Sprintf(`<div class="qr" style="font-family: monospace;width: %dem;max-width:calc( 100%% - 2em );padding: 0 1em 1em 1em;background: white; color: black;border:1em solid black;">%c`, (*code).Bounds().Dx()+1, '\n')
+	if headers != nil && len(*headers) > 0 {
 		for _, v := range *headers {
 			output += "<p>" + v + "</p>\n"
 		}
-		output += "<hr>\n"
 	}
-	dx := (*code).Bounds().Dx()
-	dy := (*code).Bounds().Dy()
-	output += "<table class\"qrstr-code\" style=\"border-collapse: collapse;\">\n"
-	for y := 0; y < dy; y++ {
-		output += "<tr>\n"
-		for x := 0; x < dx; x++ {
-			if (*code).At(x, y) == color.Black {
-				output += "<td class=\"qrstr-black\"></td>\n"
-			} else {
-				output += "<td class=\"qrstr-white\"></td>\n"
-			}
-		}
-		output += "</tr>\n"
+	s, _ := svg(rc, code, nil)
+	if s == "" {
+		return "", ErrCodeNil
 	}
-	output += "</table></div>\n"
+	output += s + "</div>"
 	return output, nil
 }
 
@@ -262,12 +265,17 @@ const (
 	TextLightMode EncoderType = 1
 	// HTMLMode makes qr codes for embedding in HTML documents or web pages.
 	// Colours are set automatically with this mode.
-	// Generates a table using HTML tags, does not require a monospace font.
+	// Returns a div with headers and an SVG image of the qr code.
 	HTMLMode EncoderType = 2
 	// TerminalMode makes qr codes for printing on xterm terminals with auto color.
 	// Colours are set automatically with this mode.
 	// MUST BE PRINTED/DISPLAYED USING A MONOSPACE FONT.
 	TerminalMode EncoderType = 3
+	// SVGMode makes an SVG image of the qr code.
+	// The output is a string containing the SVG code. It can be used directly in HTML documents or web pages.
+	// It can also be saved to a file with a .svg extension.
+	// Does not implement headers, if any are provided, an error will be returned.
+	SVGMode EncoderType = 4
 
 	// ErrorCorrection7Percent indicates 7% of lost data can be recovered, makes the qr code smaller
 	ErrorCorrection7Percent ErrorCorrectionLevel = 0
@@ -297,6 +305,9 @@ func NewEncoder(encoderType EncoderType, errorCorrectionLevel ErrorCorrectionLev
 		break
 	case HTMLMode:
 		q.strFunc = html
+		break
+	case SVGMode:
+		q.strFunc = svg
 		break
 	case TerminalMode:
 		q.rc = &darkMode

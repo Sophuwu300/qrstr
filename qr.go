@@ -1,11 +1,17 @@
 package qrstr
 
 /*
- * This file is to turn strings into unicode or html qr codes.
+ * File: qr.go
  * Author: sophuwu <sophie@sophuwu.com>
- * Feel free to use this code in any way you want.
+ * License: MIT
+
+ * qrstr
+ * qrstr provides simple standardised interface
+ various formats, including text, HTML, and SVG. It supports different error
+ correction levels and allows for optional headers to be displayed above the QR
+ code.
  * The header will display the string above the qr code.
- */
+*/
 
 import (
 	"fmt"
